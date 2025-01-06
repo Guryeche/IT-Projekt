@@ -1,240 +1,143 @@
-#include <ncurses.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
-#include <time.h>
 #include <stdio.h>
+#include <curses.h>
 
-int max_size = 8;
-int SHIP_COUNT = 8;
+#define GAME_METRIC_HEIGHT 3
 
-// Spielfeldstruktur (mit dynamischer Allokation)
-char **player_board;
-char **computer_board;
-int **player_hit_board;
-int **computer_hit_board;
+// Funktion zur Initialisierung des Spielfeldes
+void initGameBuffer(int start_y, int start_x, int height, int width) {
+    // Zeichne Ecken
+    mvaddch(start_y, start_x, ACS_ULCORNER);
+    mvaddch(start_y, start_x + width - 1, ACS_URCORNER);
+    mvaddch(start_y + height - 1, start_x, ACS_LLCORNER);
+    mvaddch(start_y + height - 1, start_x + width - 1, ACS_LRCORNER);
 
-// Schiffarten
-int ship_sizes[] = {4, 3, 3, 2, 2, 2, 1, 1, 1, 1};
-
-int cursorX = 0, cursorY = 0;
-
-int ASCII_A = (int) 'A';
-
-// Farben initialisieren
-void init_colors() {
-    start_color();
-    init_pair(1, COLOR_WHITE, COLOR_BLUE);   // Wasser
-    init_pair(2, COLOR_WHITE, COLOR_BLACK);  // Treffer
-    init_pair(3, COLOR_WHITE, COLOR_RED);    // Fehlschuss
-    init_pair(4, COLOR_BLACK, COLOR_WHITE);  // Schiff
-    init_pair(5, COLOR_YELLOW, COLOR_BLACK); // Text
-    init_pair(6, COLOR_BLACK, COLOR_YELLOW); // Cursor
-}
-
-// Spielfeld initialisieren
-void init_board(char **board, int **hit_board) {
-    for (int i = 1; i < max_size; i++) {
-        for (int j = 1; j < max_size; j++) {
-            board[i][j] = '~';
-            hit_board[i][j] = 0;
+    // Zeichne Seiten
+    for (int y = 1; y < height - 1; y++) {
+        if (y % 2 == 0) {
+            // T-Kreuzungen für linke und rechte Seite
+            mvaddch(start_y + y, start_x, ACS_LTEE); // Linke T-Kreuzung
+            mvaddch(start_y + y, start_x + width - 1, ACS_RTEE); // Rechte T-Kreuzung
+        } else {
+            // Vertikale Linien für linke und rechte Seite
+            mvaddch(start_y + y, start_x, ACS_VLINE); // Linke Linie
+            mvaddch(start_y + y, start_x + width - 1, ACS_VLINE); // Rechte Linie
         }
     }
-}
 
-// Spielfeld zeichnen
-void draw_board(char **board, int **hit_board) {
-    clear();
-    for (int i = 0; i < max_size; i++) {
-        
-            if (i == 0) {
-               printw("%s ", "  ");
-            } else {
-               printw("%2d ", i);
-            }
+    // Zeichne obere und untere Linie
+    for (int x = 1; x < width - 1; x++) {
+        if (x % 4 == 0) {
+            // T-Kreuzung für obere Linie
+            mvaddch(start_y, start_x + x, ACS_TTEE);
+            // T-Kreuzung für untere Linie
+            mvaddch(start_y + height - 1, start_x + x, ACS_BTEE);
+        } else {
+            // Horizontale Linie
+            mvaddch(start_y, start_x + x, ACS_HLINE);
+            mvaddch(start_y + height - 1, start_x + x, ACS_HLINE);
+        }
+    }
 
-        for (int j = 0; j < max_size; j++) {
-        
-            if (i == 0 && j< (max_size - 1) ) {
-                printw("%c ", (char)(ASCII_A + j));
-            } else if (cursorX == i && cursorY == j) {
-                attron(COLOR_PAIR(6));
-                printw("X ");
-                attroff(COLOR_PAIR(6));
-            } else if (hit_board[i][j] == 1) {
-                attron(COLOR_PAIR(2));
-                printw("X ");
-                attroff(COLOR_PAIR(2));
-            } else if (hit_board[i][j] == -1) {
-                attron(COLOR_PAIR(3));
-                printw("O ");
-                attroff(COLOR_PAIR(3));
+    // Zeichne Kreuzungspunkte und horizontale Trennlinien
+    // Mittlere Linien
+    for (int y = 1; y <= height - 2; y++) {
+        for (int x = 1; x <= width - 2; x++) {
+            if (x % 4 == 0 && y % 2 == 0) {
+                // Kreuzungspunkt
+                mvaddch(start_y + y, start_x + x, ACS_PLUS);
+            } else if (y % 2 == 0) {
+                // Horizontale Linien
+                mvaddch(start_y + y, start_x + x, ACS_HLINE);
+            } else if (x % 4 == 0) {
+                // Vertikale Linien
+                mvaddch(start_y + y, start_x + x, ACS_VLINE);
             } else {
-                attron(COLOR_PAIR(1));
-                printw("%c ", board[i][j]);
-                attroff(COLOR_PAIR(1));
+                // Alternativer Hintergrund (optional)
+                mvaddch(start_y + y, start_x + x, ' ');
             }
         }
-        printw("\n");
     }
+    
     refresh();
 }
 
-// Spiel speichern
-void save_game() {
-    FILE *file = fopen("battleship_save.dat", "wb");
-    if (!file) {
-        printw("Fehler beim Speichern des Spiels!\n");
-        return;
+// Funktion zur Initialisierung des unteren Bereichs (Game Metric)
+void initGameMetricBuffer(int start_y, int start_x, int height, int width, int gameMetricBuffer[][width]) {
+    // -------------------------------------------------------------------
+    // Füllen des Basis-Feldes mit Leerzeichen
+    // -------------------------------------------------------------------
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            if (x == width - 1) {
+                gameMetricBuffer[y][x] = '\0';  // Nullterminierung statt Zeilenumbruch
+            } else {
+                gameMetricBuffer[y][x] = ' ';   // Leerzeichen für das restliche Feld
+            }
+        }
     }
-    fwrite(player_board[0], sizeof(char), max_size * max_size, file);
-    fwrite(computer_board[0], sizeof(char), max_size * max_size, file);
-    fwrite(player_hit_board[0], sizeof(int), max_size * max_size, file);
-    fwrite(computer_hit_board[0], sizeof(int), max_size * max_size, file);
-    fclose(file);
-    printw("Spiel erfolgreich gespeichert!\n");
-    refresh();
-    getch();
+
+    // Ecken setzen
+    gameMetricBuffer[start_y][start_x] = ACS_ULCORNER;                                // Oben links
+    gameMetricBuffer[start_y][start_x + width - 1] = ACS_URCORNER;                   // Oben rechts
+    gameMetricBuffer[start_y + height - 1][start_x] = ACS_LLCORNER;                  // Unten links
+    gameMetricBuffer[start_y + height - 1][start_x + width - 1] = ACS_LRCORNER;      // Unten rechts
+
+    // Linke und rechte Seiten
+    for (int y = 1; y < height - 1; y++) {
+        gameMetricBuffer[start_y + y][start_x] = ACS_VLINE;                            // Linke Seite
+        gameMetricBuffer[start_y + y][start_x + width - 1] = ACS_VLINE;                // Rechte Seite
+    }
+
+    // Obere und untere Linie
+    for (int x = 1; x < width - 1; x++) {
+        gameMetricBuffer[start_y][start_x + x] = ACS_HLINE;                           // Obere Linie
+        gameMetricBuffer[start_y + height - 1][start_x + x] = ACS_HLINE;               // Untere Linie
+    }
 }
 
-// Spiel laden
-void load_game() {
-    FILE *file = fopen("battleship_save.dat", "rb");
-    if (!file) {
-        printw("Keine gespeicherte Datei gefunden!\n");
-        return;
-    }
-    fread(player_board[0], sizeof(char), max_size * max_size, file);
-    fread(computer_board[0], sizeof(char), max_size * max_size, file);
-    fread(player_hit_board[0], sizeof(int), max_size * max_size, file);
-    fread(computer_hit_board[0], sizeof(int), max_size * max_size, file);
-    fclose(file);
-    printw("Spiel erfolgreich geladen!\n");
-    refresh();
-    getch();
-}
-
-// Computerzug
-void computer_turn() {
-    int x, y;
-    do {
-        x = rand() % max_size;
-        y = rand() % max_size;
-    } while (player_hit_board[x][y] != 0);
-
-    if (player_board[x][y] == 'S') {
-        player_hit_board[x][y] = 1;
-        printw("Computer trifft bei %c%d!\n", 'A' + y, x + 1);
-    } else {
-        player_hit_board[x][y] = -1;
-        printw("Computer verfehlt bei %c%d!\n", 'A' + y, x + 1);
-    }
-    refresh();
-    getch();
-}
 
 int main() {
-    srand(time(NULL));
-    initscr();
-    start_color();
-    cbreak();
-    noecho();
-    curs_set(0);
-    keypad(stdscr, TRUE);
-    init_colors();
+    initscr();          // Startet NCurses
+    cbreak();           // Direkte Eingabe ohne Enter
+    noecho();           // Keine Anzeige der Eingabe
+    curs_set(0);        // Cursor ausblenden
 
-    int option = -1;
-    do {
-        printw("####################################### \n");
-        printw("# Waehlen Sie bitte die Feld groesse: #\n");
-        printw("# 1. Klein: 8 x 8                     #\n");
-        printw("# 2. Mittel: 10 x 10                  #\n");
-        printw("# 3. Gross: 12 x 12                   #\n");
-        printw("#######################################\n");
-        option = (int)getch() - 48;
-        if (!(option > 0 && option < 4)) {
-            printw("Die Eingabe ist falsch. Bitte nur 1, 2 oder 3 auswaehlen!\n");
-            continue;
-        }
+    int n;
 
-    } while (!(option > 0 && option < 4));
-
-    if (option == 1) {
-        max_size = 8;
-    } else if (option == 2) {
-        max_size = 10;
-    } else if (option == 3) {
-        max_size = 12;
+    // Eingabe der Spielfeldgröße
+    printw("Geben Sie die Anzahl der Zellen (min 5): ");
+    refresh();
+    scanw("%d", &n);
+    if (n < 5) {
+        printw("Ungültige Eingabe. Die Größe muss >= 5 sein.\n");
+        refresh();
+        getch();
+        endwin();
+        return 1;
     }
 
-    max_size++;
+    // Berechnung der Spielfeldgröße
+    int fieldWidth = (4 * n+2) + 3; // Jede Zelle 4 Spalten breit, inkl. Ränder
+    int fieldHeight = (2* n) + 3; // Jede Zelle 2 Zeilen hoch, inkl. Ränder
+ 
 
-    // Dynamische Allokation der Spielfelder
-    player_board = (char**)malloc(max_size * sizeof(char*));
-    computer_board = (char**)malloc(max_size * sizeof(char*));
-    player_hit_board = (int**)malloc(max_size * sizeof(int*));
-    computer_hit_board = (int**)malloc(max_size * sizeof(int*));
+    // Zeichne das Spielfeld
+    initGameBuffer(1, 1, fieldHeight, fieldWidth);
 
-    // Speicher für jedes Feld allokieren
-    for (int i = 0; i < max_size; i++) {
-        player_board[i] = (char*)malloc(max_size * sizeof(char));
-        computer_board[i] = (char*)malloc(max_size * sizeof(char));
-        player_hit_board[i] = (int*)malloc(max_size * sizeof(int));
-        computer_hit_board[i] = (int*)malloc(max_size * sizeof(int));
-    }
+    // Zeichne den unteren Bereich (Game Metric)
+    int metricWidth = fieldWidth; // Gleiche Breite wie Spielfeld
+    int gameMetricBuffer[GAME_METRIC_HEIGHT][metricWidth]; // Array für Game Metric
+    initGameMetricBuffer(fieldHeight + 2, 1, GAME_METRIC_HEIGHT, metricWidth, gameMetricBuffer);
+    
 
-    init_board(player_board, player_hit_board);
-    init_board(computer_board, computer_hit_board);
+    
+    // Beispielinhalt im Game Metric Bereich
+    mvprintw(fieldHeight + 3, 3, "Schiffe: 10");
+    mvprintw(fieldHeight + 4, 3, "Treffer: 5");
+    mvprintw(fieldHeight + 5, 3, "Fehlschuesse: 2");
 
-    int ch;
-    while (1) {
-        draw_board(computer_board, computer_hit_board);
-        ch = getch();
-        switch (ch) {
-            case KEY_UP:
-                if (cursorX > 0) cursorX--;
-                break;
-            case KEY_DOWN:
-                if (cursorX < max_size - 1) cursorX++;
-                break;
-            case KEY_LEFT:
-                if (cursorY > 0) cursorY--;
-                break;
-            case KEY_RIGHT:
-                if (cursorY < max_size - 1) cursorY++;
-                break;
-            case 's':
-                save_game();
-                break;
-            case 'l':
-                load_game();
-                break;
-            default:
-                if (computer_board[cursorX][cursorY] == 'S') {
-                    computer_hit_board[cursorX][cursorY] = 1;
-                    printw("Treffer!\n");
-                } else {
-                    computer_hit_board[cursorX][cursorY] = -1;
-                    printw("Fehlschuss!\n");
-                }
-                computer_turn();
-                break;
-        }
-    }
-
-    // Freigeben des dynamisch allozierten Speichers
-    for (int i = 0; i < max_size; i++) {
-        free(player_board[i]);
-        free(computer_board[i]);
-        free(player_hit_board[i]);
-        free(computer_hit_board[i]);
-    }
-
-    free(player_board);
-    free(computer_board);
-    free(player_hit_board);
-    free(computer_hit_board);
-
-    endwin();
+    refresh(); // Änderungen anzeigen
+    getch();   // Warten auf Benutzereingabe
+    endwin();  // Beendet NCurses
     return 0;
 }
