@@ -53,18 +53,30 @@ void draw_board(char **board, int **hit_board) {
     int table_width = max_size * cell_width + 1;  // +1 für Rahmen
     int table_height = max_size * cell_height + 1; // +1 für Rahmen
 
-    // Rahmen und Zellen zeichnen
     for (int i = 0; i < table_height; i++) {
         for (int j = 0; j < table_width; j++) {
-            if (i % cell_height == 0 && j % cell_width == 0) {
-                // Kreuzungspunkt
-                mvaddch(i, j, ACS_PLUS);
+            if (i == 0 && j == 0) {
+                mvaddch(i, j, ACS_ULCORNER); // Oben links
+            } else if (i == 0 && j == table_width - 1) {
+                mvaddch(i, j, ACS_URCORNER); // Oben rechts
+            } else if (i == table_height - 1 && j == 0) {
+                mvaddch(i, j, ACS_LLCORNER); // Unten links
+            } else if (i == table_height - 1 && j == table_width - 1) {
+                mvaddch(i, j, ACS_LRCORNER); // Unten rechts
+            } else if (i == 0 && j % cell_width == 0) {
+                mvaddch(i, j, ACS_TTEE); // Verbindet obere Linie mit Spalten
+            } else if (i == table_height - 1 && j % cell_width == 0) {
+                mvaddch(i, j, ACS_BTEE); // Verbindet untere Linie mit Spalten
+            } else if (j == 0 && i % cell_height == 0) {
+                mvaddch(i, j, ACS_LTEE); // Verbindet linke Linie mit Zeilen
+            } else if (j == table_width - 1 && i % cell_height == 0) {
+                mvaddch(i, j, ACS_RTEE); // Verbindet rechte Linie mit Zeilen
+            } else if (i % cell_height == 0 && j % cell_width == 0) {
+                mvaddch(i, j, ACS_PLUS); // Kreuzungspunkte
             } else if (i % cell_height == 0) {
-                // Horizontale Linie
-                mvaddch(i, j, ACS_HLINE);
+                mvaddch(i, j, ACS_HLINE); // Horizontale Linien
             } else if (j % cell_width == 0) {
-                // Vertikale Linie
-                mvaddch(i, j, ACS_VLINE);
+                mvaddch(i, j, ACS_VLINE); // Vertikale Linien
             } else {
                 // Zelleninhalt
                 int cell_x = (i / cell_height) - 1; // Spielfeldindex X
@@ -97,30 +109,21 @@ void draw_board(char **board, int **hit_board) {
         }
     }
 
-// Buchstabenzeile (X-Achse, um eine Spalte nach rechts verschoben)
-for (int j = 1; j < max_size; j++) {
-    int horizontal_center = j * cell_width + cell_width / 2; // Horizontale Mitte der Zelle
-    mvprintw(cell_height - 1, horizontal_center, "%c", ASCII_A + j-1 ); // Buchstaben ab Spalte (0,1)
-}
+    // X-Achse (Buchstaben)
+    for (int j = 1; j < max_size; j++) {
+        int horizontal_center = j * cell_width + cell_width / 2; // Mitte der Zelle
+        mvprintw(cell_height - 1, horizontal_center, "%c", ASCII_A + j - 1); // Buchstaben
+    }
 
-
-    // Seitenzahlen (Nummern auf der Y-Achse)
-    // Linke Spalte (Zahlen auf der Y-Achse, um eine Zelle nach unten verschoben)
-// Linke Spalte (Zahlen auf der Y-Achse mittig platzieren)
-for (int i = 1; i < max_size; i++) {
-    int vertical_center = i * cell_height + cell_height / 2; // Vertikales Zentrum der Zelle
-    mvprintw(vertical_center, cell_width / 2 - 1, "%2d", i); // Horizontale Position anpassen
-}
-
-
-
-    // Durchgehende vertikale Linie auf der linken Seite
-    for (int i = 0; i < table_height; i++) {
-        mvaddch(i, 0, ACS_VLINE);
+    // Y-Achse (Zahlen)
+    for (int i = 1; i < max_size; i++) {
+        int vertical_center = i * cell_height + cell_height / 2; // Mitte der Zelle
+        mvprintw(vertical_center, cell_width / 2 - 1, "%2d", i); // Zahlen
     }
 
     refresh();
 }
+
 
 
 
